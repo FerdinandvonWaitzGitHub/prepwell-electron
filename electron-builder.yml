@@ -24,8 +24,9 @@ mac:
   gatekeeperAssess: false
   # Code-Signing: wird über Umgebungsvariablen gesteuert
   # CSC_LINK + CSC_KEY_PASSWORD in GitHub Secrets
-  notarize:
-    teamId: P75B5M5WNV   # ← Apple Developer Team ID hier eintragen
+  # Notarisierung temporär deaktiviert — hängt in CI, wird separat nachgerüstet
+  # notarize:
+  #   teamId: P75B5M5WNV
 
 dmg:
   artifactName: PrepWell.${ext}
