@@ -24,8 +24,7 @@ mac:
   gatekeeperAssess: false
   # Code-Signing: wird über Umgebungsvariablen gesteuert
   # CSC_LINK + CSC_KEY_PASSWORD in GitHub Secrets
-  notarize:
-    teamId: P75B5M5WNV
+  notarize: true
 
 dmg:
   artifactName: PrepWell.${ext}

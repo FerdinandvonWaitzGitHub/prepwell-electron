@@ -22,7 +22,27 @@ jobs:
 
       - run: npm ci
 
+      - name: Verify Apple credentials exist
+        run: |
+          echo "APPLE_ID is set: ${{ secrets.APPLE_ID != '' }}"
+          echo "APPLE_APP_SPECIFIC_PASSWORD is set: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD != '' }}"
+          echo "APPLE_TEAM_ID is set: ${{ secrets.APPLE_TEAM_ID != '' }}"
+          echo "CSC_LINK is set: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 != '' }}"
+
+      - name: Test notarization credentials
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcrun notarytool store-credentials "AC_PASSWORD" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD"
+          echo "Credentials stored successfully — notarization auth works!"
+
       - name: Build & Package
+        timeout-minutes: 20
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 }}
@@ -30,6 +50,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          DEBUG: electron-builder
         run: npm run dist:mac
 
       - name: Upload artifacts
