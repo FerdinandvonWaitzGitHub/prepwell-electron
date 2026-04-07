@@ -42,7 +42,7 @@ jobs:
           echo "Credentials stored successfully — notarization auth works!"
 
       - name: Build & Package
-        timeout-minutes: 20
+        timeout-minutes: 30
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 }}
