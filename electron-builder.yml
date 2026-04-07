@@ -18,14 +18,14 @@ mac:
     - target: dmg
       arch:
         - universal   # Intel + Apple Silicon in einem Binary
-  icon: resources/icon.icns
+  icon: resources/icon.png  # electron-builder converts to .icns automatically
   darkModeSupport: true
   hardenedRuntime: true
   gatekeeperAssess: false
   # Code-Signing: wird über Umgebungsvariablen gesteuert
   # CSC_LINK + CSC_KEY_PASSWORD in GitHub Secrets
   notarize:
-    teamId: DEIN_TEAM_ID   # ← Apple Developer Team ID hier eintragen
+    teamId: P75B5M5WNV   # ← Apple Developer Team ID hier eintragen
 
 dmg:
   title: PrepWell

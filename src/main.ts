@@ -75,10 +75,8 @@ function createWindow(): void {
     }
   });
 
-  // DevTools only in dev
-  if (IS_DEV) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
-  }
+  // DevTools: F12 or Ctrl+Shift+I to open manually in dev
+  // (not auto-opened to avoid second window)
 
   mainWindow.on('closed', () => {
     mainWindow = null;

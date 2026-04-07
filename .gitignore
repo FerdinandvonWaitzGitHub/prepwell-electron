@@ -10,3 +10,11 @@ out/
 *.msi
 .DS_Store
 Thumbs.db
+
+# Signing certificates — NEVER commit
+*.key
+*.p12
+*.cer
+*.pem
+*.certSigningRequest
+*_base64.txt
