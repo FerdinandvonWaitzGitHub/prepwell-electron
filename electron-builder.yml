@@ -22,9 +22,10 @@ mac:
   darkModeSupport: true
   hardenedRuntime: true
   gatekeeperAssess: false
-  # Code-Signing: wird über Umgebungsvariablen gesteuert
-  # CSC_LINK + CSC_KEY_PASSWORD in GitHub Secrets
-  notarize: true
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+
+afterSign: scripts/notarize.js
 
 dmg:
   artifactName: PrepWell.${ext}
