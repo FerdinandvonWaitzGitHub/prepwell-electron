@@ -28,6 +28,7 @@ mac:
     teamId: P75B5M5WNV   # ← Apple Developer Team ID hier eintragen
 
 dmg:
+  artifactName: PrepWell.${ext}
   title: PrepWell
   iconSize: 80
   contents:
@@ -47,6 +48,7 @@ win:
   icon: resources/icon.ico
 
 nsis:
+  artifactName: PrepWell-Setup.${ext}
   oneClick: true
   perMachine: false
   allowToChangeInstallationDirectory: false
