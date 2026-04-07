@@ -20,6 +20,7 @@ mac:
         - universal   # Intel + Apple Silicon in einem Binary
   icon: resources/icon.png  # electron-builder converts to .icns automatically
   darkModeSupport: true
+  notarize: false          # afterSign hook handles notarization; prevent electron-builder auto-notarize
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: resources/entitlements.mac.plist
@@ -28,6 +29,7 @@ mac:
 afterSign: scripts/notarize.js
 
 dmg:
+  sign: false                # DMG should not be signed separately (app inside is already signed+notarized)
   artifactName: PrepWell.${ext}
   title: PrepWell
   iconSize: 80

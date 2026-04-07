@@ -2,6 +2,10 @@ const { execSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 exports.default = async function notarizing(context) {
   const { electronPlatformName, appOutDir, arch } = context;
 
@@ -24,57 +28,85 @@ exports.default = async function notarizing(context) {
     return;
   }
 
-  // Step 1: Create a zip for notarization (notarytool requires zip/dmg/pkg)
+  const appleId = process.env.APPLE_ID;
+  const password = process.env.APPLE_APP_SPECIFIC_PASSWORD;
+  const teamId = process.env.APPLE_TEAM_ID;
+  const credentials = `--apple-id "${appleId}" --team-id "${teamId}" --password "${password}"`;
+
+  // Step 1: Zip the app (notarytool needs zip/dmg/pkg)
   const zipPath = path.join(appOutDir, `${appName}.zip`);
-  console.log(`Creating zip for notarization: ${zipPath}`);
+  console.log(`Creating zip: ${zipPath}`);
   execSync(`ditto -c -k --keepParent "${appPath}" "${zipPath}"`, { stdio: "inherit" });
 
   const fileSize = (fs.statSync(zipPath).size / 1024 / 1024).toFixed(1);
   console.log(`Zip created: ${fileSize} MB`);
 
-  // Step 2: Submit to Apple via notarytool directly (full control + live output)
-  console.log("Submitting to Apple notarization service...");
   try {
-    const submitResult = execSync(
-      `xcrun notarytool submit "${zipPath}" ` +
-      `--apple-id "${process.env.APPLE_ID}" ` +
-      `--team-id "${process.env.APPLE_TEAM_ID}" ` +
-      `--password "${process.env.APPLE_APP_SPECIFIC_PASSWORD}" ` +
-      `--wait --timeout 15m`,
-      { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"], timeout: 20 * 60 * 1000 }
+    // Step 2: Submit WITHOUT --wait (--wait hangs, see electron/notarize#179)
+    console.log("Submitting to Apple (without --wait)...");
+    const submitOutput = execSync(
+      `xcrun notarytool submit "${zipPath}" ${credentials} --output-format json`,
+      { encoding: "utf-8", timeout: 5 * 60 * 1000 }
     );
-    console.log("notarytool output:", submitResult);
+    console.log("Submit response:", submitOutput);
 
-    if (!submitResult.includes("Accepted")) {
-      // Get the submission ID and fetch the log
-      const idMatch = submitResult.match(/id:\s*([a-f0-9-]+)/i);
-      if (idMatch) {
-        console.log("Fetching notarization log...");
-        const log = execSync(
-          `xcrun notarytool log "${idMatch[1]}" ` +
-          `--apple-id "${process.env.APPLE_ID}" ` +
-          `--team-id "${process.env.APPLE_TEAM_ID}" ` +
-          `--password "${process.env.APPLE_APP_SPECIFIC_PASSWORD}"`,
-          { encoding: "utf-8" }
-        );
-        console.log("Notarization log:", log);
-      }
-      throw new Error("Notarization was not accepted. See log above.");
+    const submitData = JSON.parse(submitOutput);
+    const submissionId = submitData.id;
+
+    if (!submissionId) {
+      throw new Error(`No submission ID returned: ${submitOutput}`);
     }
-  } catch (err) {
-    // If it errored, try to get the log anyway
-    console.error("Notarization failed:", err.message);
-    if (err.stdout) console.log("stdout:", err.stdout);
-    if (err.stderr) console.log("stderr:", err.stderr);
-    throw err;
+
+    console.log(`Submission ID: ${submissionId} — polling for result...`);
+
+    // Step 3: Poll manually every 30s, max 15 min
+    const maxAttempts = 30;
+    let status = "In Progress";
+
+    for (let i = 1; i <= maxAttempts; i++) {
+      await sleep(30_000);
+
+      console.log(`Poll ${i}/${maxAttempts}...`);
+      const infoOutput = execSync(
+        `xcrun notarytool info "${submissionId}" ${credentials} --output-format json`,
+        { encoding: "utf-8", timeout: 60_000 }
+      );
+
+      const infoData = JSON.parse(infoOutput);
+      status = infoData.status;
+      console.log(`Status: ${status}`);
+
+      if (status === "Accepted") {
+        console.log("Notarization accepted by Apple!");
+        break;
+      }
+
+      if (status === "Invalid" || status === "Rejected") {
+        // Fetch Apple's detailed log
+        console.error(`Notarization ${status}. Fetching Apple log...`);
+        try {
+          const log = execSync(
+            `xcrun notarytool log "${submissionId}" ${credentials}`,
+            { encoding: "utf-8", timeout: 60_000 }
+          );
+          console.error("Apple notarization log:", log);
+        } catch (e) {
+          console.error("Could not fetch log:", e.message);
+        }
+        throw new Error(`Notarization ${status}. See log above.`);
+      }
+    }
+
+    if (status !== "Accepted") {
+      throw new Error(`Notarization timed out after ${maxAttempts * 30}s. Last status: ${status}`);
+    }
+
+    // Step 4: Staple the ticket
+    console.log("Stapling notarization ticket...");
+    execSync(`xcrun stapler staple "${appPath}"`, { stdio: "inherit" });
+    console.log("Notarization complete and stapled!");
+
   } finally {
-    // Clean up zip
     if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
   }
-
-  // Step 3: Staple the ticket to the app
-  console.log("Stapling notarization ticket...");
-  execSync(`xcrun stapler staple "${appPath}"`, { stdio: "inherit" });
-
-  console.log("Notarization complete and stapled.");
 };
