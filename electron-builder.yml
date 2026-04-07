@@ -1,0 +1,61 @@
+appId: de.prepwell.desktop
+productName: PrepWell
+copyright: Copyright © 2026 PrepWell
+
+directories:
+  output: out
+  buildResources: resources
+
+files:
+  - dist/**/*
+  - resources/offline.html
+  - package.json
+
+# ─── macOS ───────────────────────────────────────────────
+mac:
+  category: public.app-category.education
+  target:
+    - target: dmg
+      arch:
+        - universal   # Intel + Apple Silicon in einem Binary
+  icon: resources/icon.icns
+  darkModeSupport: true
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  # Code-Signing: wird über Umgebungsvariablen gesteuert
+  # CSC_LINK + CSC_KEY_PASSWORD in GitHub Secrets
+  notarize:
+    teamId: DEIN_TEAM_ID   # ← Apple Developer Team ID hier eintragen
+
+dmg:
+  title: PrepWell
+  iconSize: 80
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+# ─── Windows ─────────────────────────────────────────────
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: resources/icon.ico
+
+nsis:
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  deleteAppDataOnUninstall: false
+  installerLanguages:
+    - de
+
+# ─── Auto Update ─────────────────────────────────────────
+publish:
+  provider: github
+  owner: FerdinandvonWaitzGitHub   # ← GitHub Org/User
+  repo: prepwell-electron          # ← Repo Name
