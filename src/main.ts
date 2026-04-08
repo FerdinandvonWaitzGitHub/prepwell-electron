@@ -38,6 +38,7 @@ function createWindow(): void {
       // Security: disable node integration in renderer
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
     },
     show: false, // Show when ready to avoid flash
   });
