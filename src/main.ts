@@ -48,7 +48,9 @@ function createWindow(): void {
   // Show window when content is ready (no white flash)
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
-    mainWindow?.webContents.openDevTools({ mode: 'detach' });
+    if (IS_DEV) {
+      mainWindow?.webContents.openDevTools({ mode: 'detach' });
+    }
   });
 
   // Load the web app
