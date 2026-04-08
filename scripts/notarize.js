@@ -2,6 +2,10 @@ const { execSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 exports.default = async function notarizing(context) {
   const { electronPlatformName, appOutDir, arch } = context;
 
@@ -29,7 +33,7 @@ exports.default = async function notarizing(context) {
   const teamId = process.env.APPLE_TEAM_ID;
   const credentials = `--apple-id "${appleId}" --team-id "${teamId}" --password "${password}"`;
 
-  // Step 1: Zip the app (notarytool needs zip/dmg/pkg)
+  // Step 1: Zip the app
   const zipPath = path.join(appOutDir, `${appName}.zip`);
   console.log(`Creating zip: ${zipPath}`);
   execSync(`ditto -c -k --keepParent "${appPath}" "${zipPath}"`, { stdio: "inherit" });
@@ -37,9 +41,9 @@ exports.default = async function notarizing(context) {
   const fileSize = (fs.statSync(zipPath).size / 1024 / 1024).toFixed(1);
   console.log(`Zip created: ${fileSize} MB`);
 
-  // Step 2: Submit to Apple — fire and forget, don't wait
-  console.log("Submitting to Apple notarization service...");
   try {
+    // Step 2: Submit to Apple
+    console.log("Submitting to Apple notarization service...");
     const submitOutput = execSync(
       `xcrun notarytool submit "${zipPath}" ${credentials} --output-format json`,
       { encoding: "utf-8", timeout: 5 * 60 * 1000 }
@@ -49,20 +53,59 @@ exports.default = async function notarizing(context) {
     const submitData = JSON.parse(submitOutput);
     const submissionId = submitData.id;
 
-    if (submissionId) {
-      console.log(`✅ Submitted to Apple. Submission ID: ${submissionId}`);
-      console.log(`   Apple will process in the background.`);
-      console.log(`   Check status later: xcrun notarytool info ${submissionId} ${credentials}`);
-      console.log(`   Once accepted, staple with: xcrun stapler staple "${appPath}"`);
+    if (!submissionId) {
+      throw new Error(`No submission ID returned: ${submitOutput}`);
     }
-  } catch (err) {
-    // Don't fail the build if submit fails — app is still signed and usable
-    console.error("Notarization submit failed (non-blocking):", err.message);
-    if (err.stdout) console.log("stdout:", err.stdout);
-    if (err.stderr) console.log("stderr:", err.stderr);
+
+    console.log(`Submission ID: ${submissionId} — polling for result...`);
+
+    // Step 3: Poll every 30s, max 60 min
+    const maxAttempts = 120;
+    let status = "In Progress";
+
+    for (let i = 1; i <= maxAttempts; i++) {
+      await sleep(30_000);
+
+      console.log(`Poll ${i}/${maxAttempts}...`);
+      const infoOutput = execSync(
+        `xcrun notarytool info "${submissionId}" ${credentials} --output-format json`,
+        { encoding: "utf-8", timeout: 60_000 }
+      );
+
+      const infoData = JSON.parse(infoOutput);
+      status = infoData.status;
+      console.log(`Status: ${status}`);
+
+      if (status === "Accepted") {
+        console.log("✅ Notarization accepted by Apple!");
+        break;
+      }
+
+      if (status === "Invalid" || status === "Rejected") {
+        console.error(`Notarization ${status}. Fetching Apple log...`);
+        try {
+          const log = execSync(
+            `xcrun notarytool log "${submissionId}" ${credentials}`,
+            { encoding: "utf-8", timeout: 60_000 }
+          );
+          console.error("Apple notarization log:", log);
+        } catch (e) {
+          console.error("Could not fetch log:", e.message);
+        }
+        throw new Error(`Notarization ${status}. See log above.`);
+      }
+    }
+
+    if (status !== "Accepted") {
+      throw new Error(`Notarization timed out after ${maxAttempts * 30}s. Last status: ${status}`);
+    }
+
+    // Step 4: Staple the ticket
+    console.log("Stapling notarization ticket...");
+    execSync(`xcrun stapler staple "${appPath}"`, { stdio: "inherit" });
+    console.log("✅ Notarization complete and stapled!");
+
   } finally {
     if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
   }
-
-  console.log("Build continues — notarization runs async at Apple.");
 };
