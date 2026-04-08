@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, Menu } from 'electron';
+import { app, BrowserWindow, shell, Menu, session } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import windowStateKeeper from 'electron-window-state';
 import path from 'path';
@@ -186,6 +186,11 @@ function setupAutoUpdater(): void {
 
 // ─── App Lifecycle ──────────────────────────────────────
 app.on('ready', () => {
+  // Deny all permission requests by default (camera, microphone, geolocation, etc.)
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false);
+  });
+
   createMenu();
   createWindow();
   setupAutoUpdater();
