@@ -1,11 +1,14 @@
-// Preload script — runs in renderer context with node access.
-// Currently minimal. Extend this when native features are needed
-// (e.g., file system access, notifications, protocol handlers).
+// Preload script — runs in isolated renderer context with node access.
+// Exposes a typed API to the web app via contextBridge.
+// The web app accesses this as window.electronAPI (typed in vite-env.d.ts).
 
-import { contextBridge } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 
-// Expose a minimal API to the renderer (web app)
 contextBridge.exposeInMainWorld('electronAPI', {
-  platform: process.platform,
+  /** Always true — used by ElectronGate to detect the Electron wrapper */
   isElectron: true,
+  /** Current OS: 'darwin' | 'win32' | 'linux' */
+  platform: process.platform,
+  /** Opens a URL in the system default browser (for Stripe, OAuth, etc.) */
+  openExternal: (url: string): Promise<void> => ipcRenderer.invoke('open-external', url),
 });

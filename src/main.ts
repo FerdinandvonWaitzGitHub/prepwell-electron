@@ -1,11 +1,12 @@
-import { app, BrowserWindow, shell, Menu, session } from 'electron';
+import { app, BrowserWindow, shell, Menu, session, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import windowStateKeeper from 'electron-window-state';
 import path from 'path';
 
 // ─── Config ─────────────────────────────────────────────
-const APP_URL = 'https://app.prepwell.de';
 const IS_DEV = !app.isPackaged;
+const PROD_URL = 'https://app.prepwell.de';
+const APP_URL = IS_DEV ? 'http://localhost:3000' : PROD_URL;
 
 // ─── Single Instance Lock ───────────────────────────────
 // Prevent multiple instances — focus existing window instead
@@ -184,11 +185,43 @@ function setupAutoUpdater(): void {
   autoUpdater.checkForUpdatesAndNotify();
 }
 
+// ─── IPC Handlers ──────────────────────────────────────
+// open-external: opens a URL in the system browser (Stripe, OAuth, etc.)
+// Whitelist: only HTTPS URLs are allowed to prevent abuse.
+ipcMain.handle('open-external', async (_event, url: string) => {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return;
+    await shell.openExternal(url);
+  } catch {
+    // Invalid URL — silently ignore
+  }
+});
+
 // ─── App Lifecycle ──────────────────────────────────────
 app.on('ready', () => {
   // Deny all permission requests by default (camera, microphone, geolocation, etc.)
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
     callback(false);
+  });
+
+  // CSP: restrict what the renderer can load
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          [
+            "default-src 'self' https://app.prepwell.de https://*.supabase.co",
+            "script-src 'self' 'unsafe-inline'",                              // Vite injects inline scripts
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",  // Tailwind + Google Fonts
+            "font-src 'self' https://fonts.gstatic.com",
+            "img-src 'self' data: blob: https:",
+            "connect-src 'self' https://app.prepwell.de https://*.supabase.co wss://*.supabase.co",
+          ].join('; '),
+        ],
+      },
+    });
   });
 
   createMenu();
