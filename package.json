@@ -1,6 +1,6 @@
 {
   "name": "prepwell-desktop",
-  "version": "1.0.0",
+  "version": "1.0.12",
   "description": "PrepWell Desktop App — Electron Shell",
   "main": "dist/main.js",
   "private": true,
